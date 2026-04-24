@@ -8,5 +8,9 @@ namespace DermaApp.API.Data
     {
         public AppDbContext(DbContextOptions<AppDbContext> options)
             : base(options) { }
+
+        public DbSet<SkinTestQuestion> SkinTestQuestions { get; set; }
+        public DbSet<SkinTestOption> SkinTestOptions { get; set; }
+        public DbSet<SkinTestResult> SkinTestResults { get; set; }
     }
 }

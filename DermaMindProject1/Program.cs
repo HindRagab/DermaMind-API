@@ -72,7 +72,11 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 builder.Services.AddScoped<EmailService>(); // ✅ هنا صح
-
+builder.Services.AddHttpClient();
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+{
+    options.SerializerOptions.Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+});
 var app = builder.Build();
 
 app.UseSwagger();

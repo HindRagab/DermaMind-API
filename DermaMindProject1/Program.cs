@@ -44,6 +44,17 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// ✅ CORS - ضيفيه هنا
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -71,17 +82,23 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-builder.Services.AddScoped<EmailService>(); // ✅ هنا صح
+
+builder.Services.AddScoped<EmailService>();
 builder.Services.AddHttpClient();
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
 {
     options.SerializerOptions.Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
 });
+
 var app = builder.Build();
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+// ✅ الترتيب مهم جداً هنا
+app.UseCors("AllowFrontend");      // ← أول حاجة
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
-app.Run(); // ✅ آخر سطر دايماً
+app.Run();

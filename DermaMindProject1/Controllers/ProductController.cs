@@ -1,5 +1,6 @@
 ﻿using DermaApp.API.Data;
 using DermaApp.API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -27,8 +28,9 @@ namespace DermaApp.API.Controllers
             return Ok(products);
         }
 
-        // ✅ إضافة منتج جديد
+        // ✅ إضافة منتج جديد (Admin فقط)
         [HttpPost("add")]
+        [Authorize]
         public async Task<IActionResult> AddProduct(Product product)
         {
             _context.Products.Add(product);

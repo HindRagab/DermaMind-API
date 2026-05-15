@@ -1,4 +1,5 @@
-﻿using DermaApp.API.DTOs;
+﻿using DermaApp.API.Data;
+using DermaApp.API.DTOs;
 using DermaApp.API.Models;
 using DermaApp.API.Services;
 using Microsoft.AspNetCore.Identity;
@@ -17,21 +18,21 @@ namespace DermaApp.API.Controllers
         private readonly UserManager<User> _userManager;
         private readonly IConfiguration _config;
         private readonly EmailService _emailService;
-
-        // تخزين OTP مؤقتاً في الميموري
-        private static Dictionary<string, (string Otp, DateTime Expiry)> _otpStore = new();
+        private readonly AppDbContext _context;
 
         public AuthController(UserManager<User> userManager,
-            IConfiguration config, EmailService emailService)
+            IConfiguration config, EmailService emailService, AppDbContext context)
         {
             _userManager = userManager;
             _config = config;
             _emailService = emailService;
+            _context = context;
         }
+
 
         // ✅ Register
         [HttpPost("register")]
-        public async Task<IActionResult> Register(RegisterDto dto)
+        public async Task<IActionResult> Register([FromForm] RegisterDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
@@ -47,12 +48,29 @@ namespace DermaApp.API.Controllers
                 UserName = dto.Email
             };
 
+            // رفع الصورة لو موجودة
+            if (dto.ProfileImage != null && dto.ProfileImage.Length > 0)
+            {
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images");
+                Directory.CreateDirectory(uploadsFolder);
+
+                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(dto.ProfileImage.FileName)}";
+                var filePath = Path.Combine(uploadsFolder, fileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await dto.ProfileImage.CopyToAsync(stream);
+                }
+
+                user.ProfileImage = $"/images/{fileName}";
+            }
+
             var result = await _userManager.CreateAsync(user, dto.Password);
 
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            return Ok(new { message = "Registered successfully!" });
+            return Ok(new { message = "Registered successfully!", profileImage = user.ProfileImage });
         }
 
         // ✅ Login
@@ -91,7 +109,19 @@ namespace DermaApp.API.Controllers
                 return NotFound(new { message = "Email not found" });
 
             var otp = new Random().Next(100000, 999999).ToString();
-            _otpStore[dto.Email] = (otp, DateTime.UtcNow.AddMinutes(10));
+
+            // حذف أي OTP قديم لنفس الإيميل
+            var oldOtps = _context.OtpEntries.Where(o => o.Email == dto.Email);
+            _context.OtpEntries.RemoveRange(oldOtps);
+
+            // حفظ OTP جديد في الـ Database
+            _context.OtpEntries.Add(new OtpEntry
+            {
+                Email = dto.Email,
+                Otp = otp,
+                Expiry = DateTime.UtcNow.AddMinutes(10)
+            });
+            await _context.SaveChangesAsync();
 
             await _emailService.SendOtpAsync(dto.Email, otp);
 
@@ -100,21 +130,27 @@ namespace DermaApp.API.Controllers
 
         // ✅ Verify OTP
         [HttpPost("verify-otp")]
-        public IActionResult VerifyOtp(VerifyOtpDto dto)
+        public async Task<IActionResult> VerifyOtp(VerifyOtpDto dto)
         {
-            if (!_otpStore.ContainsKey(dto.Email))
+            var otpEntry = await _context.OtpEntries
+                .FirstOrDefaultAsync(o => o.Email == dto.Email && !o.IsUsed);
+
+            if (otpEntry == null)
                 return BadRequest(new { message = "No OTP found for this email" });
 
-            var (storedOtp, expiry) = _otpStore[dto.Email];
-
-            if (DateTime.UtcNow > expiry)
+            if (DateTime.UtcNow > otpEntry.Expiry)
             {
-                _otpStore.Remove(dto.Email);
+                _context.OtpEntries.Remove(otpEntry);
+                await _context.SaveChangesAsync();
                 return BadRequest(new { message = "OTP has expired" });
             }
 
-            if (storedOtp != dto.Otp)
+            if (otpEntry.Otp != dto.Otp)
                 return BadRequest(new { message = "Invalid OTP" });
+
+            // علّم الـ OTP إنه اتتحقق منه
+            otpEntry.IsUsed = true;
+            await _context.SaveChangesAsync();
 
             return Ok(new { message = "OTP verified successfully" });
         }
@@ -123,7 +159,11 @@ namespace DermaApp.API.Controllers
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
         {
-            if (!_otpStore.ContainsKey(dto.Email))
+            // تأكد إن الـ OTP اتتحقق منه
+            var otpEntry = await _context.OtpEntries
+                .FirstOrDefaultAsync(o => o.Email == dto.Email && o.IsUsed);
+
+            if (otpEntry == null)
                 return BadRequest(new { message = "Please verify OTP first" });
 
             var user = await _userManager.FindByEmailAsync(dto.Email);
@@ -136,7 +176,9 @@ namespace DermaApp.API.Controllers
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            _otpStore.Remove(dto.Email);
+            // امسح الـ OTP من الـ Database
+            _context.OtpEntries.Remove(otpEntry);
+            await _context.SaveChangesAsync();
 
             return Ok(new { message = "Password reset successfully!" });
         }

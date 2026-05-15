@@ -16,13 +16,15 @@ namespace DermaApp.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly HttpClient _httpClient;
-        private readonly string _paymobApiKey = "ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2TVRFMU5qa3hPU3dpYm1GdFpTSTZJbWx1YVhScFlXd2lmUS5ESlpmdnA5SnVNRDVjbHBINUd0V3FJbW9HbXhLeHh4ekRvLWJBWlI2VTYzeHJnck85RV9XZEFHWmdmcXV2MGlMWXAxbWlIQVdhMUMzNjN5S184ZU5fZw==";
-        private readonly int _integrationId = 5634242;
+        private readonly string _paymobApiKey;
+        private readonly int _integrationId;
 
-        public CartController(AppDbContext context, IHttpClientFactory httpClientFactory)
+        public CartController(AppDbContext context, IHttpClientFactory httpClientFactory, IConfiguration config)
         {
             _context = context;
             _httpClient = httpClientFactory.CreateClient();
+            _paymobApiKey = config["Paymob:ApiKey"]!;
+            _integrationId = config.GetValue<int>("Paymob:IntegrationId");
         }
 
         // ✅ إضافة منتج للسلة

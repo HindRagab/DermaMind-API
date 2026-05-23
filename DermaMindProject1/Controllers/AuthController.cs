@@ -76,7 +76,8 @@ namespace DermaApp.API.Controllers
 
         // ✅ Login
         [HttpPost("login")]
-        public async Task<IActionResult> Login(LoginDto dto)
+        //public async Task<IActionResult> Login(LoginDto dto)
+        public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
             var user = await _userManager.FindByEmailAsync(dto.Email);
             if (user == null)
@@ -109,7 +110,7 @@ namespace DermaApp.API.Controllers
             if (user == null)
                 return NotFound(new { message = "Email not found" });
 
-            var otp = new Random().Next(100000, 999999).ToString();
+            var otp = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
 
             // حذف أي OTP قديم لنفس الإيميل
             var oldOtps = _context.OtpEntries.Where(o => o.Email == dto.Email);

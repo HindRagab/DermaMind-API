@@ -20,50 +20,43 @@ namespace DermaApp.API.Controllers
             _context = context;
         }
 
-        // ✅ جلب منتجات من الـ Database
-        [HttpGet]
-        public async Task<IActionResult> GetProducts()
-        {
-            var products = await _context.Products.ToListAsync();
-            return Ok(products);
-        }
-
-        // ✅ إضافة منتج جديد (Admin فقط)
-        [HttpPost("add")]
-        [Authorize]
-        public async Task<IActionResult> AddProduct(Product product)
-        {
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
-            return Ok(new { message = "Product added successfully!", product });
-        }
-
-        // ✅ جلب منتجات الـ Skincare من Open Beauty Facts
+        // ✅ جلب منتجات Skincare من Makeup API
         [HttpGet("skincare")]
         public async Task<IActionResult> GetSkincareProducts()
         {
-            var url = "https://world.openbeautyfacts.org/cgi/search.pl?search_terms=skincare&search_simple=1&action=process&json=1&page_size=20";
-            var response = await _httpClient.GetAsync(url);
-            var json = await response.Content.ReadAsStringAsync();
-            var data = JsonSerializer.Deserialize<JsonElement>(json);
-
-            var products = new List<object>();
-            if (data.TryGetProperty("products", out var productList))
+            try
             {
-                foreach (var product in productList.EnumerateArray())
-                {
-                    var name = product.TryGetProperty("product_name", out var n) ? n.GetString() : "Unknown";
-                    var image = product.TryGetProperty("image_url", out var img) ? img.GetString() : "";
-                    var brand = product.TryGetProperty("brands", out var b) ? b.GetString() : "";
-                    var category = product.TryGetProperty("categories", out var c) ? c.GetString() : "";
+                var url = "https://makeup-api.herokuapp.com/api/v1/products.json?product_type=skincare";
+                var response = await _httpClient.GetAsync(url);
+                var json = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<JsonElement>(json);
 
-                    if (!string.IsNullOrEmpty(name) && name != "Unknown")
+                var products = new List<object>();
+                foreach (var product in data.EnumerateArray())
+                {
+                    var name = product.TryGetProperty("name", out var n) ? n.GetString() : null;
+                    var brand = product.TryGetProperty("brand", out var b) ? b.GetString() : null;
+                    var price = product.TryGetProperty("price", out var p) ? p.GetString() : null;
+                    var image = product.TryGetProperty("image_link", out var img) ? img.GetString() : null;
+
+                    if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(image))
                     {
-                        products.Add(new { name, brand, image, category });
+                        products.Add(new
+                        {
+                            name,
+                            brand = brand ?? "Unknown",
+                            price = price ?? "0",
+                            image
+                        });
                     }
                 }
+
+                return Ok(products);
             }
-            return Ok(products);
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching products", error = ex.Message });
+            }
         }
 
         // ✅ البحث عن منتج
@@ -73,28 +66,57 @@ namespace DermaApp.API.Controllers
             if (string.IsNullOrEmpty(query))
                 return BadRequest(new { message = "Please enter a search term" });
 
-            var url = $"https://world.openbeautyfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1&page_size=10";
-            var response = await _httpClient.GetAsync(url);
-            var json = await response.Content.ReadAsStringAsync();
-            var data = JsonSerializer.Deserialize<JsonElement>(json);
-
-            var products = new List<object>();
-            if (data.TryGetProperty("products", out var productList))
+            try
             {
-                foreach (var product in productList.EnumerateArray())
-                {
-                    var name = product.TryGetProperty("product_name", out var n) ? n.GetString() : "Unknown";
-                    var image = product.TryGetProperty("image_url", out var img) ? img.GetString() : "";
-                    var brand = product.TryGetProperty("brands", out var b) ? b.GetString() : "";
-                    var category = product.TryGetProperty("categories", out var c) ? c.GetString() : "";
+                var url = $"https://makeup-api.herokuapp.com/api/v1/products.json?brand={query}";
+                var response = await _httpClient.GetAsync(url);
+                var json = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<JsonElement>(json);
 
-                    if (!string.IsNullOrEmpty(name) && name != "Unknown")
+                var products = new List<object>();
+                foreach (var product in data.EnumerateArray())
+                {
+                    var name = product.TryGetProperty("name", out var n) ? n.GetString() : null;
+                    var brand = product.TryGetProperty("brand", out var b) ? b.GetString() : null;
+                    var price = product.TryGetProperty("price", out var p) ? p.GetString() : null;
+                    var image = product.TryGetProperty("image_link", out var img) ? img.GetString() : null;
+
+                    if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(image))
                     {
-                        products.Add(new { name, brand, image, category });
+                        products.Add(new
+                        {
+                            name,
+                            brand = brand ?? "Unknown",
+                            price = price ?? "0",
+                            image
+                        });
                     }
                 }
+
+                return Ok(products);
             }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error searching products", error = ex.Message });
+            }
+        }
+
+        // ✅ جلب منتجات من الـ Database
+        [HttpGet]
+        public async Task<IActionResult> GetProducts()
+        {
+            var products = await _context.Products.ToListAsync();
             return Ok(products);
+        }
+
+        // ✅ إضافة منتج (Admin)
+        [HttpPost("add")]
+        [Authorize]
+        public async Task<IActionResult> AddProduct(Product product)
+        {
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Product added successfully!", product });
         }
     }
 }

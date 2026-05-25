@@ -50,7 +50,14 @@ namespace DermaApp.API.Controllers
 
             return Ok(products);
         }
-
+        [HttpDelete("all")]
+        public async Task<IActionResult> DeleteAllProducts()
+        {
+            var all = await _context.Products.ToListAsync();
+            _context.Products.RemoveRange(all);
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "All products deleted!" });
+        }
         // ✅ إضافة منتج (Admin)
         [HttpPost("add")]
         [Authorize]

@@ -190,7 +190,7 @@ namespace DermaApp.API.Controllers
             var paymentKeyData = JsonSerializer.Deserialize<JsonElement>(paymentKeyJson);
             var paymentKey = paymentKeyData.GetProperty("token").GetString();
 
-            // Save Order in DB
+            // ✅ Save Order as Pending - مش بنمسح الـ Cart هنا
             var order = new Order
             {
                 UserId = userId,
@@ -206,7 +206,6 @@ namespace DermaApp.API.Controllers
             };
 
             _context.Orders.Add(order);
-            _context.CartItems.RemoveRange(cartItems);
             await _context.SaveChangesAsync();
 
             var paymentUrl = $"https://accept.paymob.com/api/acceptance/iframes/{_integrationId}?payment_token={paymentKey}";
@@ -218,6 +217,52 @@ namespace DermaApp.API.Controllers
                 orderId = order.Id,
                 totalAmount
             });
+        }
+
+        // ✅ Webhook - Paymob بيبعت التأكيد هنا
+        [HttpPost("webhook")]
+        [AllowAnonymous]
+        public async Task<IActionResult> PaymobWebhook()
+        {
+            using var reader = new StreamReader(Request.Body);
+            var body = await reader.ReadToEndAsync();
+            var data = JsonSerializer.Deserialize<JsonElement>(body);
+
+            try
+            {
+                var obj = data.GetProperty("obj");
+                var success = obj.GetProperty("success").GetBoolean();
+                var paymobOrderId = obj.GetProperty("order").GetProperty("id").GetInt64().ToString();
+
+                var order = await _context.Orders
+                    .Include(o => o.Items)
+                    .FirstOrDefaultAsync(o => o.PaymobOrderId == paymobOrderId);
+
+                if (order == null)
+                    return Ok();
+
+                if (success && order.Status == "Pending")
+                {
+                    // ✅ الدفع اتأكد - بنحدث الـ Order ونمسح الـ Cart
+                    order.Status = "Paid";
+
+                    var cartItems = await _context.CartItems
+                        .Where(c => c.UserId == order.UserId)
+                        .ToListAsync();
+
+                    _context.CartItems.RemoveRange(cartItems);
+                    await _context.SaveChangesAsync();
+                }
+                else if (!success && order.Status == "Pending")
+                {
+                    // ❌ الدفع فشل - بنحدث الـ Status بس الـ Cart بيفضل
+                    order.Status = "Failed";
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch { }
+
+            return Ok();
         }
     }
 }

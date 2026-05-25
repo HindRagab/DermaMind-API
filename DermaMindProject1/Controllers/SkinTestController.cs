@@ -81,6 +81,7 @@ namespace DermaApp.API.Controllers
         public async Task<IActionResult> GetMyResult()
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
             var result = await _context.SkinTestResults
                 .Where(r => r.UserId == userId)
                 .OrderByDescending(r => r.TakenAt)
@@ -108,8 +109,111 @@ namespace DermaApp.API.Controllers
 
             _context.SkinTestQuestions.Add(question);
             await _context.SaveChangesAsync();
-
             return Ok(new { message = "Question added successfully!" });
+        }
+
+        // ✅ Seed الأسئلة
+        [HttpPost("seed-questions")]
+        public async Task<IActionResult> SeedQuestions()
+        {
+            if (await _context.SkinTestQuestions.AnyAsync())
+                return BadRequest(new { message = "Questions already exist!" });
+
+            var questions = new List<SkinTestQuestion>
+            {
+                new SkinTestQuestion
+                {
+                    QuestionText = "كيف تبدو بشرتك بعد ساعتين من غسلها بدون أي منتجات؟",
+                    Options = new List<SkinTestOption>
+                    {
+                        new SkinTestOption { OptionText = "جافة ومشدودة", SkinTypePoint = "Dry" },
+                        new SkinTestOption { OptionText = "طبيعية ومريحة", SkinTypePoint = "Normal" },
+                        new SkinTestOption { OptionText = "دهنية في كل الوجه", SkinTypePoint = "Oily" },
+                        new SkinTestOption { OptionText = "دهنية في منطقة T فقط", SkinTypePoint = "Combination" }
+                    }
+                },
+                new SkinTestQuestion
+                {
+                    QuestionText = "كيف تتفاعل بشرتك مع المنتجات الجديدة؟",
+                    Options = new List<SkinTestOption>
+                    {
+                        new SkinTestOption { OptionText = "تتهيج وتحمر بسهولة", SkinTypePoint = "Sensitive" },
+                        new SkinTestOption { OptionText = "لا تتفاعل عادةً", SkinTypePoint = "Normal" },
+                        new SkinTestOption { OptionText = "تظهر حبوب أحياناً", SkinTypePoint = "Oily" },
+                        new SkinTestOption { OptionText = "تجف وتتقشر", SkinTypePoint = "Dry" }
+                    }
+                },
+                new SkinTestQuestion
+                {
+                    QuestionText = "ما حجم مسام بشرتك؟",
+                    Options = new List<SkinTestOption>
+                    {
+                        new SkinTestOption { OptionText = "مسام صغيرة جداً لا تكاد تُرى", SkinTypePoint = "Dry" },
+                        new SkinTestOption { OptionText = "مسام متوسطة الحجم", SkinTypePoint = "Normal" },
+                        new SkinTestOption { OptionText = "مسام كبيرة وواضحة", SkinTypePoint = "Oily" },
+                        new SkinTestOption { OptionText = "كبيرة في منطقة T وصغيرة في الخدين", SkinTypePoint = "Combination" }
+                    }
+                },
+                new SkinTestQuestion
+                {
+                    QuestionText = "كيف تبدو بشرتك عند النظر في المرآة؟",
+                    Options = new List<SkinTestOption>
+                    {
+                        new SkinTestOption { OptionText = "مطفية وبدون لمعة", SkinTypePoint = "Dry" },
+                        new SkinTestOption { OptionText = "مشرقة وطبيعية", SkinTypePoint = "Normal" },
+                        new SkinTestOption { OptionText = "لامعة ودهنية", SkinTypePoint = "Oily" },
+                        new SkinTestOption { OptionText = "لامعة في المنتصف وعادية على الجانبين", SkinTypePoint = "Combination" }
+                    }
+                },
+                new SkinTestQuestion
+                {
+                    QuestionText = "هل تعانين من الجفاف أو التقشر؟",
+                    Options = new List<SkinTestOption>
+                    {
+                        new SkinTestOption { OptionText = "نعم دائماً", SkinTypePoint = "Dry" },
+                        new SkinTestOption { OptionText = "أحياناً في الشتاء فقط", SkinTypePoint = "Normal" },
+                        new SkinTestOption { OptionText = "نادراً جداً", SkinTypePoint = "Oily" },
+                        new SkinTestOption { OptionText = "في بعض المناطق فقط", SkinTypePoint = "Combination" }
+                    }
+                },
+                new SkinTestQuestion
+                {
+                    QuestionText = "كيف تتأثر بشرتك بأشعة الشمس؟",
+                    Options = new List<SkinTestOption>
+                    {
+                        new SkinTestOption { OptionText = "تحترق بسرعة وتحمر", SkinTypePoint = "Sensitive" },
+                        new SkinTestOption { OptionText = "تحترق أحياناً ثم تعود طبيعية", SkinTypePoint = "Normal" },
+                        new SkinTestOption { OptionText = "تتحول للون بني بسهولة", SkinTypePoint = "Oily" },
+                        new SkinTestOption { OptionText = "نادراً ما تتأثر", SkinTypePoint = "Combination" }
+                    }
+                },
+                new SkinTestQuestion
+                {
+                    QuestionText = "هل تلاحظين خطوط أو تجاعيد مبكرة في بشرتك؟",
+                    Options = new List<SkinTestOption>
+                    {
+                        new SkinTestOption { OptionText = "نعم وبشكل واضح", SkinTypePoint = "Dry" },
+                        new SkinTestOption { OptionText = "بدأت تظهر قليلاً", SkinTypePoint = "Normal" },
+                        new SkinTestOption { OptionText = "لا تقريباً", SkinTypePoint = "Oily" },
+                        new SkinTestOption { OptionText = "في مناطق معينة فقط", SkinTypePoint = "Combination" }
+                    }
+                },
+                new SkinTestQuestion
+                {
+                    QuestionText = "ما الذي يصف بشرتك بعد التعرض للبرد أو الرياح؟",
+                    Options = new List<SkinTestOption>
+                    {
+                        new SkinTestOption { OptionText = "تجف وتتشقق بسهولة", SkinTypePoint = "Dry" },
+                        new SkinTestOption { OptionText = "تتهيج وتحمر", SkinTypePoint = "Sensitive" },
+                        new SkinTestOption { OptionText = "لا تتأثر كثيراً", SkinTypePoint = "Oily" },
+                        new SkinTestOption { OptionText = "تجف في الخدين فقط", SkinTypePoint = "Combination" }
+                    }
+                }
+            };
+
+            _context.SkinTestQuestions.AddRange(questions);
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Questions seeded successfully!", count = questions.Count });
         }
     }
 }

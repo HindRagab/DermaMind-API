@@ -10,6 +10,8 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 
 namespace DermaApp.API.Controllers
 {
@@ -21,6 +23,7 @@ namespace DermaApp.API.Controllers
         private readonly IConfiguration _config;
         private readonly EmailService _emailService;
         private readonly AppDbContext _context;
+        private readonly Cloudinary _cloudinary;
 
         public AuthController(UserManager<User> userManager,
             IConfiguration config, EmailService emailService, AppDbContext context)
@@ -29,8 +32,14 @@ namespace DermaApp.API.Controllers
             _config = config;
             _emailService = emailService;
             _context = context;
-        }
 
+            var account = new Account(
+                config["Cloudinary:CloudName"],
+                config["Cloudinary:ApiKey"],
+                config["Cloudinary:ApiSecret"]
+            );
+            _cloudinary = new Cloudinary(account);
+        }
 
         // ✅ Register
         [HttpPost("register")]
@@ -50,25 +59,21 @@ namespace DermaApp.API.Controllers
                 UserName = dto.Email
             };
 
-            // رفع الصورة لو موجودة
+            // رفع الصورة على Cloudinary
             if (dto.ProfileImage != null && dto.ProfileImage.Length > 0)
             {
-                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images");
-                Directory.CreateDirectory(uploadsFolder);
-
-                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(dto.ProfileImage.FileName)}";
-                var filePath = Path.Combine(uploadsFolder, fileName);
-
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                using var stream = dto.ProfileImage.OpenReadStream();
+                var uploadParams = new ImageUploadParams
                 {
-                    await dto.ProfileImage.CopyToAsync(stream);
-                }
-
-                user.ProfileImage = $"/images/{fileName}";
+                    File = new FileDescription(dto.ProfileImage.FileName, stream),
+                    Folder = "dermamind/profiles"
+                };
+                var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+                user.ProfileImage = uploadResult.SecureUrl.ToString();
             }
 
+            // ✅ حفظ الـ user في الداتا بيز
             var result = await _userManager.CreateAsync(user, dto.Password);
-
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
@@ -77,7 +82,6 @@ namespace DermaApp.API.Controllers
 
         // ✅ Login
         [HttpPost("login")]
-        //public async Task<IActionResult> Login(LoginDto dto)
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
             var user = await _userManager.FindByEmailAsync(dto.Email);
@@ -113,11 +117,9 @@ namespace DermaApp.API.Controllers
 
             var otp = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
 
-            // حذف أي OTP قديم لنفس الإيميل
             var oldOtps = _context.OtpEntries.Where(o => o.Email == dto.Email);
             _context.OtpEntries.RemoveRange(oldOtps);
 
-            // حفظ OTP جديد في الـ Database
             _context.OtpEntries.Add(new OtpEntry
             {
                 Email = dto.Email,
@@ -151,7 +153,6 @@ namespace DermaApp.API.Controllers
             if (otpEntry.Otp != dto.Otp)
                 return BadRequest(new { message = "Invalid OTP" });
 
-            // علّم الـ OTP إنه اتتحقق منه
             otpEntry.IsUsed = true;
             await _context.SaveChangesAsync();
 
@@ -162,7 +163,6 @@ namespace DermaApp.API.Controllers
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
         {
-            // تأكد إن الـ OTP اتتحقق منه
             var otpEntry = await _context.OtpEntries
                 .FirstOrDefaultAsync(o => o.Email == dto.Email && o.IsUsed);
 
@@ -179,7 +179,6 @@ namespace DermaApp.API.Controllers
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            // امسح الـ OTP من الـ Database
             _context.OtpEntries.Remove(otpEntry);
             await _context.SaveChangesAsync();
 

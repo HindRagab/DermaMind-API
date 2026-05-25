@@ -8,8 +8,7 @@ namespace DermaApp.API.Controllers
     public class DermaScanController : ControllerBase
     {
         private readonly HttpClient _httpClient;
-        private readonly string _aiBaseUrl = "https://derma-mind-api-production.up.railway.app";
-
+        private readonly string _aiBaseUrl = "https://derma-mind-api-production-a4c0.up.railway.app";
         public DermaScanController(IHttpClientFactory httpClientFactory)
         {
             _httpClient = httpClientFactory.CreateClient();

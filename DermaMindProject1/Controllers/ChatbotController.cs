@@ -9,8 +9,7 @@ namespace DermaApp.API.Controllers
     public class ChatbotController : ControllerBase
     {
         private readonly HttpClient _httpClient;
-        private readonly string _aiBaseUrl = "https://derma-mind-api-production.up.railway.app";
-
+        private readonly string _aiBaseUrl = "https://derma-mind-api-production-a4c0.up.railway.app";
         public ChatbotController(IHttpClientFactory httpClientFactory)
         {
             _httpClient = httpClientFactory.CreateClient();
@@ -38,7 +37,8 @@ namespace DermaApp.API.Controllers
                     "application/json"));
 
             var result = await response.Content.ReadAsStringAsync();
-            return Ok(result);
+            var resultJson = JsonSerializer.Deserialize<JsonElement>(result);
+            return Ok(resultJson);
         }
     }
 

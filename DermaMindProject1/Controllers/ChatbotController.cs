@@ -29,17 +29,29 @@ namespace DermaApp.API.Controllers
                 diagnosis_context = dto.DiagnosisContext ?? ""
             };
 
-            var response = await _httpClient.PostAsync(
-                $"{_aiBaseUrl}/chat",
-                new StringContent(
-                    JsonSerializer.Serialize(requestBody),
-                    Encoding.UTF8,
-                    "application/json"));
+            try
+            {
+                var response = await _httpClient.PostAsync(
+                    $"{_aiBaseUrl}/chat",
+                    new StringContent(
+                        JsonSerializer.Serialize(requestBody),
+                        Encoding.UTF8,
+                        "application/json"));
 
-            var result = await response.Content.ReadAsStringAsync();
-            var resultJson = JsonSerializer.Deserialize<JsonElement>(result);
-            return Ok(resultJson);
+                var result = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode((int)response.StatusCode, new { message = result });
+
+                var resultJson = JsonSerializer.Deserialize<JsonElement>(result);
+                return Ok(resultJson);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "حدث خطأ في الاتصال بالـ AI", error = ex.Message });
+            }
         }
+    }
     }
 
     public class ChatbotRequestDto
@@ -48,4 +60,3 @@ namespace DermaApp.API.Controllers
         public List<object>? History { get; set; }
         public string? DiagnosisContext { get; set; }
     }
-}

@@ -69,7 +69,8 @@ namespace DermaApp.API.Controllers
                     Folder = "dermamind/profiles"
                 };
                 var uploadResult = await _cloudinary.UploadAsync(uploadParams);
-                user.ProfileImage = uploadResult.SecureUrl.ToString();
+                if (uploadResult?.SecureUrl != null)
+                    user.ProfileImage = uploadResult.SecureUrl.ToString();
             }
 
             // ✅ حفظ الـ user في الداتا بيز

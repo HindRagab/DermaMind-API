@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Database
@@ -44,7 +45,7 @@ builder.Services.AddAuthentication(options =>
             Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"]))
     };
 });
-
+builder.Services.AddSingleton<CloudinaryService>();
 // ✅ CORS - ضيفيه هنا
 builder.Services.AddCors(options =>
 {

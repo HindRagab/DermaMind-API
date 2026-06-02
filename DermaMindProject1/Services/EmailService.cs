@@ -21,8 +21,7 @@ namespace DermaApp.API.Services
             var apiInstance = new TransactionalEmailsApi();
 
             var sendSmtpEmail = new SendSmtpEmail(
-                sender: new SendSmtpEmailSender(_config["Email:From"], "DermaMind"),
-                to: new List<SendSmtpEmailTo> { new SendSmtpEmailTo(toEmail) },
+            sender: new SendSmtpEmailSender("hindragab72@gmail.com", "DermaMind"), to: new List<SendSmtpEmailTo> { new SendSmtpEmailTo(toEmail) },
                 subject: "Your OTP Code - DermaMind",
                 htmlContent: $@"
                     <h2>DermaMind - Password Reset</h2>

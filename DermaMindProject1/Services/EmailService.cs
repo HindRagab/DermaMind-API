@@ -30,7 +30,7 @@ namespace DermaApp.API.Services
             };
 
             using var client = new SmtpClient();
-            await client.ConnectAsync("smtp-relay.brevo.com", 587, SecureSocketOptions.StartTls);
+            await client.ConnectAsync("smtp-relay.brevo.com", 2525, SecureSocketOptions.StartTls);
             await client.AuthenticateAsync(_config["Brevo:SmtpLogin"], _config["Brevo:SmtpKey"]);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);

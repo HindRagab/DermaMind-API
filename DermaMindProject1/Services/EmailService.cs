@@ -30,11 +30,10 @@ namespace DermaApp.API.Services
 
             using var client = new SmtpClient();
 
-            // ✅ StartTLS على port 587
             await client.ConnectAsync(
-                _config["Email:Host"],
-                int.Parse(_config["Email:Port"]),
-                SecureSocketOptions.StartTls);
+          _config["Email:Host"],
+           int.Parse(_config["Email:Port"]),
+            SecureSocketOptions.SslOnConnect); // ✅ SSL بدل StartTLS
 
             await client.AuthenticateAsync(
                 _config["Email:From"],

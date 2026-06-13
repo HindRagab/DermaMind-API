@@ -9,6 +9,7 @@ namespace DermaApp.API.Controllers
     {
         private readonly HttpClient _httpClient;
         private readonly string _aiBaseUrl = "https://derma-mind-api-production-a4c0.up.railway.app";
+
         public DermaScanController(IHttpClientFactory httpClientFactory)
         {
             _httpClient = httpClientFactory.CreateClient();
@@ -31,7 +32,6 @@ namespace DermaApp.API.Controllers
             try
             {
                 using var content = new MultipartFormDataContent();
-
                 using var stream = image.OpenReadStream();
                 using var streamContent = new StreamContent(stream);
                 streamContent.Headers.ContentType =
@@ -40,11 +40,65 @@ namespace DermaApp.API.Controllers
 
                 if (!string.IsNullOrEmpty(skin_type))
                     content.Add(new StringContent(skin_type), "skin_type");
-
                 if (!string.IsNullOrEmpty(medical_history))
                     content.Add(new StringContent(medical_history), "medical_history");
 
                 var response = await _httpClient.PostAsync($"{_aiBaseUrl}/analyze", content);
+                var resultString = await response.Content.ReadAsStringAsync();
+                var resultJson = JsonSerializer.Deserialize<JsonElement>(resultString);
+                return Ok(resultJson);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "AI service error", error = ex.Message });
+            }
+        }
+
+        // ✅ بدء التشخيص التفاعلي
+        [HttpPost("diagnose/start")]
+        public async Task<IActionResult> DiagnoseStart(
+            IFormFile image,
+            [FromForm] string? lang = "ar",
+            [FromForm] string? medical_history = null)
+        {
+            if (image == null || image.Length == 0)
+                return BadRequest(new { message = "Please upload an image" });
+
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                using var stream = image.OpenReadStream();
+                using var streamContent = new StreamContent(stream);
+                streamContent.Headers.ContentType =
+                    new System.Net.Http.Headers.MediaTypeHeaderValue(image.ContentType);
+                content.Add(streamContent, "image", image.FileName);
+                content.Add(new StringContent(lang ?? "ar"), "lang");
+                if (!string.IsNullOrEmpty(medical_history))
+                    content.Add(new StringContent(medical_history), "medical_history");
+
+                var response = await _httpClient.PostAsync($"{_aiBaseUrl}/diagnose/start", content);
+                var resultString = await response.Content.ReadAsStringAsync();
+                var resultJson = JsonSerializer.Deserialize<JsonElement>(resultString);
+                return Ok(resultJson);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "AI service error", error = ex.Message });
+            }
+        }
+
+        // ✅ إتمام التشخيص النهائي
+        [HttpPost("diagnose/complete")]
+        public async Task<IActionResult> DiagnoseComplete([FromBody] JsonElement dto)
+        {
+            try
+            {
+                var content = new StringContent(
+                    dto.GetRawText(),
+                    System.Text.Encoding.UTF8,
+                    "application/json");
+
+                var response = await _httpClient.PostAsync($"{_aiBaseUrl}/diagnose/complete", content);
                 var resultString = await response.Content.ReadAsStringAsync();
                 var resultJson = JsonSerializer.Deserialize<JsonElement>(resultString);
                 return Ok(resultJson);

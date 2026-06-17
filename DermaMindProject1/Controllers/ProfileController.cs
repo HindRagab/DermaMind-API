@@ -1,4 +1,6 @@
-﻿using DermaApp.API.Data;
+﻿using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
+using DermaApp.API.Data;
 using DermaApp.API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -14,11 +16,19 @@ namespace DermaApp.API.Controllers
     {
         private readonly UserManager<User> _userManager;
         private readonly AppDbContext _context;
+        private readonly Cloudinary _cloudinary;
 
-        public ProfileController(UserManager<User> userManager, AppDbContext context)
+        public ProfileController(UserManager<User> userManager, AppDbContext context, IConfiguration config)
         {
             _userManager = userManager;
             _context = context;
+
+            var account = new Account(
+                config["Cloudinary:CloudName"],
+                config["Cloudinary:ApiKey"],
+                config["Cloudinary:ApiSecret"]
+            );
+            _cloudinary = new Cloudinary(account);
         }
 
         // ✅ جلب بيانات المستخدم
@@ -27,7 +37,6 @@ namespace DermaApp.API.Controllers
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var user = await _userManager.FindByIdAsync(userId);
-
             if (user == null)
                 return NotFound(new { message = "User not found" });
 
@@ -41,53 +50,49 @@ namespace DermaApp.API.Controllers
             });
         }
 
-        // ✅ تعديل بيانات المستخدم
+        // ✅ تعديل الاسم والـ SkinType وصورة البروفايل
         [HttpPut("update")]
-        public async Task<IActionResult> UpdateProfile(UpdateProfileDto dto)
+        public async Task<IActionResult> UpdateProfile(
+            [FromForm] string? fullName,
+            [FromForm] string? skinType,
+            IFormFile? image)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var user = await _userManager.FindByIdAsync(userId);
-
             if (user == null)
                 return NotFound(new { message = "User not found" });
 
-            user.FullName = dto.FullName ?? user.FullName;
-            user.SkinType = dto.SkinType ?? user.SkinType;
+            // تحديث الاسم
+            if (!string.IsNullOrEmpty(fullName))
+                user.FullName = fullName;
 
-            await _userManager.UpdateAsync(user);
+            // تحديث نوع البشرة
+            if (!string.IsNullOrEmpty(skinType))
+                user.SkinType = skinType;
 
-            return Ok(new { message = "Profile updated successfully!" });
-        }
-
-        // ✅ رفع صورة شخصية
-        [HttpPost("upload-image")]
-        public async Task<IActionResult> UploadProfileImage(IFormFile image)
-        {
-            if (image == null || image.Length == 0)
-                return BadRequest(new { message = "Please upload an image" });
-
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var user = await _userManager.FindByIdAsync(userId);
-
-            // حفظ الصورة في فولدر wwwroot/images
-            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images");
-            Directory.CreateDirectory(uploadsFolder);
-
-            var fileName = $"{userId}_{Guid.NewGuid()}{Path.GetExtension(image.FileName)}";
-            var filePath = Path.Combine(uploadsFolder, fileName);
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            // رفع الصورة على Cloudinary لو موجودة
+            if (image != null && image.Length > 0)
             {
-                await image.CopyToAsync(stream);
+                using var stream = image.OpenReadStream();
+                var uploadParams = new ImageUploadParams
+                {
+                    File = new FileDescription(image.FileName, stream),
+                    Folder = "dermamind/profiles",
+                    Transformation = new Transformation().Width(300).Height(300).Crop("fill")
+                };
+                var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+                if (uploadResult?.SecureUrl != null)
+                    user.ProfileImage = uploadResult.SecureUrl.ToString();
             }
 
-            user.ProfileImage = $"/images/{fileName}";
             await _userManager.UpdateAsync(user);
 
             return Ok(new
             {
-                message = "Image uploaded successfully!",
-                imageUrl = user.ProfileImage
+                message = "Profile updated successfully!",
+                user.FullName,
+                user.SkinType,
+                user.ProfileImage
             });
         }
     }

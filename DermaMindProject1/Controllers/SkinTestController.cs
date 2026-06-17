@@ -133,6 +133,19 @@ namespace DermaApp.API.Controllers
                 Strategy = profile?.Strategy ?? "Strategy not available",
                 TakenAt = result.TakenAt
             });
+       
+        }
+        [HttpDelete("delete-questions")]
+        public async Task<IActionResult> DeleteQuestions()
+        {
+            var options = await _context.SkinTestOptions.ToListAsync();
+            _context.SkinTestOptions.RemoveRange(options);
+
+            var questions = await _context.SkinTestQuestions.ToListAsync();
+            _context.SkinTestQuestions.RemoveRange(questions);
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Questions deleted!" });
         }
 
         // ✅ Admin - إضافة سؤال جديد

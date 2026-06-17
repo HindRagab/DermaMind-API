@@ -11,6 +11,7 @@ namespace DermaApp.API.Data
             : base(options) { }
 
         public DbSet<SkinTestQuestion> SkinTestQuestions { get; set; }
+        public DbSet<SkinTypeProfile> SkinTypeProfiles { get; set; }
         public DbSet<SkinTestOption> SkinTestOptions { get; set; }
         public DbSet<SkinTestResult> SkinTestResults { get; set; }
         public DbSet<Product> Products { get; set; }

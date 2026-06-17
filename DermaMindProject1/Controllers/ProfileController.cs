@@ -5,6 +5,7 @@ using DermaApp.API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace DermaApp.API.Controllers
@@ -22,7 +23,6 @@ namespace DermaApp.API.Controllers
         {
             _userManager = userManager;
             _context = context;
-
             var account = new Account(
                 config["Cloudinary:CloudName"],
                 config["Cloudinary:ApiKey"],
@@ -62,15 +62,12 @@ namespace DermaApp.API.Controllers
             if (user == null)
                 return NotFound(new { message = "User not found" });
 
-            // تحديث الاسم
             if (!string.IsNullOrEmpty(fullName))
                 user.FullName = fullName;
 
-            // تحديث نوع البشرة
             if (!string.IsNullOrEmpty(skinType))
                 user.SkinType = skinType;
 
-            // رفع الصورة على Cloudinary لو موجودة
             if (image != null && image.Length > 0)
             {
                 using var stream = image.OpenReadStream();
@@ -95,11 +92,49 @@ namespace DermaApp.API.Controllers
                 user.ProfileImage
             });
         }
+
+        // ✅ تغيير الباسورد
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                return NotFound(new { message = "User not found" });
+
+            var result = await _userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
+
+            if (!result.Succeeded)
+                return BadRequest(new { message = "Failed to change password", errors = result.Errors });
+
+            return Ok(new { message = "Password changed successfully!" });
+
+        }
+        // ✅ جلب تاريخ تحاليل البشرة
+        [HttpGet("scan-history")]
+        public async Task<IActionResult> GetScanHistory()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            var history = await _context.DermaScanResults
+                .Where(r => r.UserId == userId)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.Diagnosis,
+                    r.ResultJson,
+                    r.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(history);
+        }
     }
 
-    public class UpdateProfileDto
+    public class ChangePasswordDto
     {
-        public string? FullName { get; set; }
-        public string? SkinType { get; set; }
+        public string CurrentPassword { get; set; } = string.Empty;
+        public string NewPassword { get; set; } = string.Empty;
     }
 }

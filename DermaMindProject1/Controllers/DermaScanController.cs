@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using DermaApp.API.Data;
+using DermaApp.API.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace DermaApp.API.Controllers
 {
@@ -9,14 +12,17 @@ namespace DermaApp.API.Controllers
     {
         private readonly HttpClient _httpClient;
         private readonly string _aiBaseUrl = "https://derma-mind-api-production-a4c0.up.railway.app";
+        private readonly AppDbContext _context;
 
-        public DermaScanController(IHttpClientFactory httpClientFactory)
+        public DermaScanController(IHttpClientFactory httpClientFactory, AppDbContext context)
         {
             _httpClient = httpClientFactory.CreateClient();
+            _context = context;
         }
 
         // ✅ تحليل صورة البشرة
         [HttpPost("analyze")]
+        [Authorize]
         public async Task<IActionResult> AnalyzeSkin(
             IFormFile image,
             [FromForm] string? skin_type = null,
@@ -46,6 +52,21 @@ namespace DermaApp.API.Controllers
                 var response = await _httpClient.PostAsync($"{_aiBaseUrl}/analyze", content);
                 var resultString = await response.Content.ReadAsStringAsync();
                 var resultJson = JsonSerializer.Deserialize<JsonElement>(resultString);
+
+                // ✅ حفظ النتيجة في البروفايل
+                var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                string? diagnosis = null;
+                if (resultJson.TryGetProperty("diagnosis", out var diagProp))
+                    diagnosis = diagProp.GetString();
+
+                _context.DermaScanResults.Add(new DermaScanResult
+                {
+                    UserId = userId ?? "",
+                    ResultJson = resultString,
+                    Diagnosis = diagnosis
+                });
+                await _context.SaveChangesAsync();
+
                 return Ok(resultJson);
             }
             catch (Exception ex)
@@ -63,7 +84,6 @@ namespace DermaApp.API.Controllers
         {
             if (image == null || image.Length == 0)
                 return BadRequest(new { message = "Please upload an image" });
-
             try
             {
                 using var content = new MultipartFormDataContent();
@@ -75,7 +95,6 @@ namespace DermaApp.API.Controllers
                 content.Add(new StringContent(lang ?? "ar"), "lang");
                 if (!string.IsNullOrEmpty(medical_history))
                     content.Add(new StringContent(medical_history), "medical_history");
-
                 var response = await _httpClient.PostAsync($"{_aiBaseUrl}/diagnose/start", content);
                 var resultString = await response.Content.ReadAsStringAsync();
                 var resultJson = JsonSerializer.Deserialize<JsonElement>(resultString);
@@ -97,7 +116,6 @@ namespace DermaApp.API.Controllers
                     dto.GetRawText(),
                     System.Text.Encoding.UTF8,
                     "application/json");
-
                 var response = await _httpClient.PostAsync($"{_aiBaseUrl}/diagnose/complete", content);
                 var resultString = await response.Content.ReadAsStringAsync();
                 var resultJson = JsonSerializer.Deserialize<JsonElement>(resultString);

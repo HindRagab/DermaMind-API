@@ -129,7 +129,19 @@ namespace DermaApp.API.Controllers
             });
             await _context.SaveChangesAsync();
 
-            await _emailService.SendOtpAsync(dto.Email, otp);
+            try
+            {
+                await _emailService.SendOtpAsync(dto.Email, otp);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Email sending failed",
+                    error = ex.Message,
+                    inner = ex.InnerException?.Message
+                });
+            }
 
             return Ok(new { message = "OTP sent to your email" });
         }

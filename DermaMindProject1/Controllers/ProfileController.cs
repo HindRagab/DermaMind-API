@@ -45,16 +45,18 @@ namespace DermaApp.API.Controllers
                 user.Id,
                 user.FullName,
                 user.Email,
+                user.PhoneNumber,
                 user.ProfileImage,
                 user.SkinType
             });
         }
 
-        // ✅ تعديل الاسم والـ SkinType وصورة البروفايل
+        // ✅ تعديل الاسم والـ SkinType ورقم الموبايل وصورة البروفايل
         [HttpPut("update")]
         public async Task<IActionResult> UpdateProfile(
             [FromForm] string? fullName,
             [FromForm] string? skinType,
+            [FromForm] string? phoneNumber,
             IFormFile? image)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -67,6 +69,9 @@ namespace DermaApp.API.Controllers
 
             if (!string.IsNullOrEmpty(skinType))
                 user.SkinType = skinType;
+
+            if (!string.IsNullOrEmpty(phoneNumber))
+                user.PhoneNumber = phoneNumber;
 
             if (image != null && image.Length > 0)
             {
@@ -89,6 +94,7 @@ namespace DermaApp.API.Controllers
                 message = "Profile updated successfully!",
                 user.FullName,
                 user.SkinType,
+                user.PhoneNumber,
                 user.ProfileImage
             });
         }
@@ -108,8 +114,8 @@ namespace DermaApp.API.Controllers
                 return BadRequest(new { message = "Failed to change password", errors = result.Errors });
 
             return Ok(new { message = "Password changed successfully!" });
-
         }
+
         // ✅ جلب تاريخ تحاليل البشرة
         [HttpGet("scan-history")]
         public async Task<IActionResult> GetScanHistory()

@@ -116,29 +116,27 @@ namespace DermaApp.API.Controllers
             return Ok(new { message = "Password changed successfully!" });
         }
 
-        // ✅ جلب تاريخ تحاليل البشرة
-        [HttpGet("scan-history")]
-        public async Task<IActionResult> GetScanHistory()
+        // ✅ جلب كل نتائج الـ Skin Test الخاصة باليوزر
+        [HttpGet("skin-test-history")]
+        public async Task<IActionResult> GetSkinTestHistory()
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            var history = await _context.DermaScanResults
+            var history = await _context.SkinTestResults
                 .Where(r => r.UserId == userId)
-                .OrderByDescending(r => r.CreatedAt)
+                .OrderByDescending(r => r.TakenAt)
                 .Select(r => new
                 {
                     r.Id,
-                    r.Diagnosis,
-                    r.ResultJson,
-                    r.CreatedAt
+                    r.SkinType,
+                    r.TakenAt
                 })
                 .ToListAsync();
 
             return Ok(history);
         }
-    }
 
-    public class ChangePasswordDto
+        public class ChangePasswordDto
     {
         public string CurrentPassword { get; set; } = string.Empty;
         public string NewPassword { get; set; } = string.Empty;

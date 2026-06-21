@@ -7,10 +7,9 @@ namespace DermaApp.API.Models
     {
         public int Id { get; set; }
         public string QuestionText { get; set; }
-
+        public string? QuestionTextEn { get; set; }
         // واحدة من: "OD", "SR", "PN", "WT"
         public string Category { get; set; }
-
         public List<SkinTestOption> Options { get; set; }
     }
 
@@ -18,9 +17,9 @@ namespace DermaApp.API.Models
     {
         public int Id { get; set; }
         public string? OptionText { get; set; }
+        public string? OptionTextEn { get; set; }
         public int QuestionId { get; set; }
         public SkinTestQuestion? Question { get; set; }
-
         // من 1 إلى 4 حسب مقياس ليكرت في الورقة البحثية
         public int Score { get; set; }
     }
@@ -30,15 +29,12 @@ namespace DermaApp.API.Models
         public int Id { get; set; }
         public string? UserId { get; set; }
         public User? User { get; set; }
-
         // الكود النهائي المكوّن من 4 حروف، مثل OSPW
         public string SkinTypeCode { get; set; }
-
         public int OD_Score { get; set; }
         public int SR_Score { get; set; }
         public int PN_Score { get; set; }
         public int WT_Score { get; set; }
-
         public DateTime TakenAt { get; set; } = DateTime.UtcNow;
     }
 
@@ -48,6 +44,8 @@ namespace DermaApp.API.Models
         public int Id { get; set; }
         public string Code { get; set; } // e.g. "OSPW"
         public string Description { get; set; }
+        public string? DescriptionEn { get; set; }
         public string Strategy { get; set; }
+        public string? StrategyEn { get; set; }
     }
 }

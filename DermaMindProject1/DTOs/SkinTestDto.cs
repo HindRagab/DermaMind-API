@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+
 namespace DermaApp.API.DTOs
 {
     public class SkinTestOptionDto

@@ -197,6 +197,57 @@ namespace DermaApp.API.Controllers
 
             return Ok(new { message = "Password reset successfully!" });
         }
+        [HttpPost("google-login")]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginDto dto)
+        {
+            try
+            {
+                var settings = new Google.Apis.Auth.GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = new List<string> { _config["Google:ClientId"] }
+                };
+
+                var payload = await Google.Apis.Auth.GoogleJsonWebSignature.ValidateAsync(dto.IdToken, settings);
+
+                var user = await _userManager.FindByEmailAsync(payload.Email);
+
+                if (user == null)
+                {
+                    // مستخدم جديد - نعمل register تلقائي
+                    user = new User
+                    {
+                        FullName = payload.Name,
+                        Email = payload.Email,
+                        UserName = payload.Email,
+                        ProfileImage = payload.Picture,
+                        EmailConfirmed = true
+                    };
+
+                    var result = await _userManager.CreateAsync(user);
+                    if (!result.Succeeded)
+                        return BadRequest(result.Errors);
+                }
+
+                var token = GenerateJwtToken(user);
+
+                return Ok(new
+                {
+                    message = "Google login successful",
+                    token,
+                    user = new
+                    {
+                        user.Id,
+                        user.FullName,
+                        user.Email,
+                        user.ProfileImage
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Invalid Google token", error = ex.Message });
+            }
+        }
 
         // 🔧 Helper - Generate JWT Token
         private string GenerateJwtToken(User user)

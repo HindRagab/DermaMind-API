@@ -128,7 +128,7 @@ namespace DermaApp.API.Controllers
                 .Select(r => new
                 {
                     r.Id,
-                    r.SkinType,
+                    r.SkinTypeCode,   // ← غيرتها من SkinType
                     r.TakenAt
                 })
                 .ToListAsync();

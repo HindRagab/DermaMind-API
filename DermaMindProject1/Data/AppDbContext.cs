@@ -20,5 +20,6 @@ namespace DermaApp.API.Data
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<OtpEntry> OtpEntries { get; set; }
         public DbSet<DermaScanResult> DermaScanResults { get; set; }
+        public DbSet<WishlistItem> WishlistItems { get; set; }
     }
 }

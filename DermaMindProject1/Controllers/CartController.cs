@@ -16,15 +16,15 @@ namespace DermaApp.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly HttpClient _httpClient;
-        private readonly string _paymobApiKey;
-        private readonly int _integrationId;
+        private readonly string _paymobSecretKey = "egy_sk_test_10b383beab01aa46afc6ca37d04b3738a681ecdad9ea4c4eafeb0318507825e7";
+        private readonly string _paymobPublicKey = "egy_pk_test_EKfHUUk1hx9RHrpOCTcu2s5BDP8udJwD";
+        private readonly int _integrationId = 5634242;
 
-        public CartController(AppDbContext context, IHttpClientFactory httpClientFactory, IConfiguration config)
+        public CartController(AppDbContext context, IHttpClientFactory httpClientFactory)
         {
             _context = context;
             _httpClient = httpClientFactory.CreateClient();
-            _paymobApiKey = config["Paymob:ApiKey"]!;
-            _integrationId = config.GetValue<int>("Paymob:IntegrationId");
+            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Token {_paymobSecretKey}");
         }
 
         // ✅ إضافة منتج للسلة
@@ -32,7 +32,6 @@ namespace DermaApp.API.Controllers
         public async Task<IActionResult> AddToCart(int productId, int quantity = 1)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
             var product = await _context.Products.FindAsync(productId);
             if (product == null)
                 return NotFound(new { message = "Product not found" });
@@ -41,18 +40,14 @@ namespace DermaApp.API.Controllers
                 .FirstOrDefaultAsync(c => c.UserId == userId && c.ProductId == productId);
 
             if (existingItem != null)
-            {
                 existingItem.Quantity += quantity;
-            }
             else
-            {
                 _context.CartItems.Add(new CartItem
                 {
                     UserId = userId,
                     ProductId = productId,
                     Quantity = quantity
                 });
-            }
 
             await _context.SaveChangesAsync();
             return Ok(new { message = "Product added to cart!" });
@@ -101,6 +96,7 @@ namespace DermaApp.API.Controllers
             return Ok(new { message = "Item removed from cart!" });
         }
 
+        // ✅ Checkout
         [HttpPost("checkout")]
         public async Task<IActionResult> Checkout()
         {
@@ -117,107 +113,48 @@ namespace DermaApp.API.Controllers
 
             var totalAmount = cartItems.Sum(c => c.Quantity * c.Product.Price);
 
+            var orderItems = cartItems.Select(c => new
+            {
+                name = c.Product.Name,
+                amount = (int)(c.Product.Price * 100),
+                description = c.Product.Description ?? "",
+                quantity = c.Quantity
+            }).ToList();
+
             try
             {
-                // Step 1: Auth Token
-                var authResponse = await _httpClient.PostAsync(
-                    "https://accept.paymob.com/api/auth/tokens",
-                    new StringContent(
-                        JsonSerializer.Serialize(new { api_key = _paymobApiKey }),
-                        Encoding.UTF8, "application/json"));
-
-                var authJson = await authResponse.Content.ReadAsStringAsync();
-
-                if (!authResponse.IsSuccessStatusCode)
-                    return StatusCode(500, new { step = "auth", paymobResponse = authJson });
-
-                var authData = JsonSerializer.Deserialize<JsonElement>(authJson);
-                if (!authData.TryGetProperty("token", out var tokenProp))
-                    return StatusCode(500, new { step = "auth-parse", paymobResponse = authJson });
-
-                var authToken = tokenProp.GetString();
-
-                // Step 2: Create Order
-                var orderItems = cartItems.Select(c => new
-                {
-                    name = c.Product.Name,
-                    amount_cents = (int)(c.Product.Price * 100),
-                    description = c.Product.Description ?? "",
-                    quantity = c.Quantity
-                }).ToList();
-
-                var orderResponse = await _httpClient.PostAsync(
-                    "https://accept.paymob.com/api/ecommerce/orders",
+                var intentionResponse = await _httpClient.PostAsync(
+                    "https://accept.paymob.com/v1/intention/",
                     new StringContent(
                         JsonSerializer.Serialize(new
                         {
-                            auth_token = authToken,
-                            delivery_needed = false,
-                            amount_cents = (int)(totalAmount * 100),
+                            amount = (int)(totalAmount * 100),
                             currency = "EGP",
-                            items = orderItems
-                        }),
-                        Encoding.UTF8, "application/json"));
-
-                var orderJson = await orderResponse.Content.ReadAsStringAsync();
-
-                if (!orderResponse.IsSuccessStatusCode)
-                    return StatusCode(500, new { step = "order", paymobResponse = orderJson });
-
-                var orderData = JsonSerializer.Deserialize<JsonElement>(orderJson);
-                if (!orderData.TryGetProperty("id", out var orderIdProp))
-                    return StatusCode(500, new { step = "order-parse", paymobResponse = orderJson });
-
-                var paymobOrderId = orderIdProp.GetInt64();
-
-                // Step 3: Payment Key
-                var paymentKeyResponse = await _httpClient.PostAsync(
-                    "https://accept.paymob.com/api/acceptance/payment_keys",
-                    new StringContent(
-                        JsonSerializer.Serialize(new
-                        {
-                            auth_token = authToken,
-                            amount_cents = (int)(totalAmount * 100),
-                            expiration = 3600,
-                            order_id = paymobOrderId,
+                            payment_methods = new[] { _integrationId },
+                            items = orderItems,
                             billing_data = new
                             {
                                 first_name = user.FullName ?? "Customer",
                                 last_name = ".",
                                 email = user.Email,
-                                phone_number = "01000000000",
-                                apartment = "NA",
-                                floor = "NA",
-                                street = "NA",
-                                building = "NA",
-                                shipping_method = "NA",
-                                postal_code = "NA",
-                                city = "NA",
-                                country = "EG",
-                                state = "NA"
-                            },
-                            currency = "EGP",
-                            integration_id = _integrationId
+                                phone_number = user.PhoneNumber ?? "01000000000"
+                            }
                         }),
                         Encoding.UTF8, "application/json"));
 
-                var paymentKeyJson = await paymentKeyResponse.Content.ReadAsStringAsync();
+                var intentionJson = await intentionResponse.Content.ReadAsStringAsync();
 
-                if (!paymentKeyResponse.IsSuccessStatusCode)
-                    return StatusCode(500, new { step = "payment_key", paymobResponse = paymentKeyJson });
+                if (!intentionResponse.IsSuccessStatusCode)
+                    return StatusCode(500, new { step = "intention", paymobResponse = intentionJson });
 
-                var paymentKeyData = JsonSerializer.Deserialize<JsonElement>(paymentKeyJson);
-                if (!paymentKeyData.TryGetProperty("token", out var payKeyProp))
-                    return StatusCode(500, new { step = "payment_key-parse", paymobResponse = paymentKeyJson });
+                var intentionData = JsonSerializer.Deserialize<JsonElement>(intentionJson);
+                var clientSecret = intentionData.GetProperty("client_secret").GetString();
 
-                var paymentKey = payKeyProp.GetString();
-
-                // ✅ Save Order as Pending
+                // Save Order
                 var order = new Order
                 {
                     UserId = userId,
                     TotalAmount = totalAmount,
-                    PaymobOrderId = paymobOrderId.ToString(),
                     Status = "Pending",
                     Items = cartItems.Select(c => new OrderItem
                     {
@@ -230,7 +167,7 @@ namespace DermaApp.API.Controllers
                 _context.Orders.Add(order);
                 await _context.SaveChangesAsync();
 
-                var paymentUrl = $"https://accept.paymob.com/api/acceptance/iframes/{_integrationId}?payment_token={paymentKey}";
+                var paymentUrl = $"https://accept.paymob.com/unifiedcheckout/?publicKey={_paymobPublicKey}&clientSecret={clientSecret}";
 
                 return Ok(new
                 {
@@ -242,11 +179,11 @@ namespace DermaApp.API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Checkout failed", error = ex.Message, stack = ex.StackTrace });
+                return StatusCode(500, new { message = "Checkout failed", error = ex.Message });
             }
         }
 
-        // ✅ Webhook - Paymob بيبعت التأكيد هنا
+        // ✅ Webhook
         [HttpPost("webhook")]
         [AllowAnonymous]
         public async Task<IActionResult> PaymobWebhook()
@@ -265,24 +202,19 @@ namespace DermaApp.API.Controllers
                     .Include(o => o.Items)
                     .FirstOrDefaultAsync(o => o.PaymobOrderId == paymobOrderId);
 
-                if (order == null)
-                    return Ok();
+                if (order == null) return Ok();
 
                 if (success && order.Status == "Pending")
                 {
-                    // ✅ الدفع اتأكد - بنحدث الـ Order ونمسح الـ Cart
                     order.Status = "Paid";
-
                     var cartItems = await _context.CartItems
                         .Where(c => c.UserId == order.UserId)
                         .ToListAsync();
-
                     _context.CartItems.RemoveRange(cartItems);
                     await _context.SaveChangesAsync();
                 }
                 else if (!success && order.Status == "Pending")
                 {
-                    // ❌ الدفع فشل - بنحدث الـ Status بس الـ Cart بيفضل
                     order.Status = "Failed";
                     await _context.SaveChangesAsync();
                 }

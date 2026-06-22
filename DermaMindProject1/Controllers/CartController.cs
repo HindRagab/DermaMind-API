@@ -101,7 +101,6 @@ namespace DermaApp.API.Controllers
             return Ok(new { message = "Item removed from cart!" });
         }
 
-        // ✅ Checkout - الدفع عن طريق Paymob
         [HttpPost("checkout")]
         public async Task<IActionResult> Checkout()
         {
@@ -118,105 +117,133 @@ namespace DermaApp.API.Controllers
 
             var totalAmount = cartItems.Sum(c => c.Quantity * c.Product.Price);
 
-            // Step 1: Auth Token
-            var authResponse = await _httpClient.PostAsync(
-                "https://accept.paymob.com/api/auth/tokens",
-                new StringContent(
-                    JsonSerializer.Serialize(new { api_key = _paymobApiKey }),
-                    Encoding.UTF8, "application/json"));
-
-            var authJson = await authResponse.Content.ReadAsStringAsync();
-            var authData = JsonSerializer.Deserialize<JsonElement>(authJson);
-            var authToken = authData.GetProperty("token").GetString();
-
-            // Step 2: Create Order
-            var orderItems = cartItems.Select(c => new
+            try
             {
-                name = c.Product.Name,
-                amount_cents = (int)(c.Product.Price * 100),
-                description = c.Product.Description ?? "",
-                quantity = c.Quantity
-            }).ToList();
+                // Step 1: Auth Token
+                var authResponse = await _httpClient.PostAsync(
+                    "https://accept.paymob.com/api/auth/tokens",
+                    new StringContent(
+                        JsonSerializer.Serialize(new { api_key = _paymobApiKey }),
+                        Encoding.UTF8, "application/json"));
 
-            var orderResponse = await _httpClient.PostAsync(
-                "https://accept.paymob.com/api/ecommerce/orders",
-                new StringContent(
-                    JsonSerializer.Serialize(new
-                    {
-                        auth_token = authToken,
-                        delivery_needed = false,
-                        amount_cents = (int)(totalAmount * 100),
-                        currency = "EGP",
-                        items = orderItems
-                    }),
-                    Encoding.UTF8, "application/json"));
+                var authJson = await authResponse.Content.ReadAsStringAsync();
 
-            var orderJson = await orderResponse.Content.ReadAsStringAsync();
-            var orderData = JsonSerializer.Deserialize<JsonElement>(orderJson);
-            var paymobOrderId = orderData.GetProperty("id").GetInt64();
+                if (!authResponse.IsSuccessStatusCode)
+                    return StatusCode(500, new { step = "auth", paymobResponse = authJson });
 
-            // Step 3: Payment Key
-            var paymentKeyResponse = await _httpClient.PostAsync(
-                "https://accept.paymob.com/api/acceptance/payment_keys",
-                new StringContent(
-                    JsonSerializer.Serialize(new
-                    {
-                        auth_token = authToken,
-                        amount_cents = (int)(totalAmount * 100),
-                        expiration = 3600,
-                        order_id = paymobOrderId,
-                        billing_data = new
-                        {
-                            first_name = user.FullName ?? "Customer",
-                            last_name = ".",
-                            email = user.Email,
-                            phone_number = "01000000000",
-                            apartment = "NA",
-                            floor = "NA",
-                            street = "NA",
-                            building = "NA",
-                            shipping_method = "NA",
-                            postal_code = "NA",
-                            city = "NA",
-                            country = "EG",
-                            state = "NA"
-                        },
-                        currency = "EGP",
-                        integration_id = _integrationId
-                    }),
-                    Encoding.UTF8, "application/json"));
+                var authData = JsonSerializer.Deserialize<JsonElement>(authJson);
+                if (!authData.TryGetProperty("token", out var tokenProp))
+                    return StatusCode(500, new { step = "auth-parse", paymobResponse = authJson });
 
-            var paymentKeyJson = await paymentKeyResponse.Content.ReadAsStringAsync();
-            var paymentKeyData = JsonSerializer.Deserialize<JsonElement>(paymentKeyJson);
-            var paymentKey = paymentKeyData.GetProperty("token").GetString();
+                var authToken = tokenProp.GetString();
 
-            // ✅ Save Order as Pending - مش بنمسح الـ Cart هنا
-            var order = new Order
-            {
-                UserId = userId,
-                TotalAmount = totalAmount,
-                PaymobOrderId = paymobOrderId.ToString(),
-                Status = "Pending",
-                Items = cartItems.Select(c => new OrderItem
+                // Step 2: Create Order
+                var orderItems = cartItems.Select(c => new
                 {
-                    ProductId = c.ProductId,
-                    Quantity = c.Quantity,
-                    Price = c.Product.Price
-                }).ToList()
-            };
+                    name = c.Product.Name,
+                    amount_cents = (int)(c.Product.Price * 100),
+                    description = c.Product.Description ?? "",
+                    quantity = c.Quantity
+                }).ToList();
 
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
+                var orderResponse = await _httpClient.PostAsync(
+                    "https://accept.paymob.com/api/ecommerce/orders",
+                    new StringContent(
+                        JsonSerializer.Serialize(new
+                        {
+                            auth_token = authToken,
+                            delivery_needed = false,
+                            amount_cents = (int)(totalAmount * 100),
+                            currency = "EGP",
+                            items = orderItems
+                        }),
+                        Encoding.UTF8, "application/json"));
 
-            var paymentUrl = $"https://accept.paymob.com/api/acceptance/iframes/{_integrationId}?payment_token={paymentKey}";
+                var orderJson = await orderResponse.Content.ReadAsStringAsync();
 
-            return Ok(new
+                if (!orderResponse.IsSuccessStatusCode)
+                    return StatusCode(500, new { step = "order", paymobResponse = orderJson });
+
+                var orderData = JsonSerializer.Deserialize<JsonElement>(orderJson);
+                if (!orderData.TryGetProperty("id", out var orderIdProp))
+                    return StatusCode(500, new { step = "order-parse", paymobResponse = orderJson });
+
+                var paymobOrderId = orderIdProp.GetInt64();
+
+                // Step 3: Payment Key
+                var paymentKeyResponse = await _httpClient.PostAsync(
+                    "https://accept.paymob.com/api/acceptance/payment_keys",
+                    new StringContent(
+                        JsonSerializer.Serialize(new
+                        {
+                            auth_token = authToken,
+                            amount_cents = (int)(totalAmount * 100),
+                            expiration = 3600,
+                            order_id = paymobOrderId,
+                            billing_data = new
+                            {
+                                first_name = user.FullName ?? "Customer",
+                                last_name = ".",
+                                email = user.Email,
+                                phone_number = "01000000000",
+                                apartment = "NA",
+                                floor = "NA",
+                                street = "NA",
+                                building = "NA",
+                                shipping_method = "NA",
+                                postal_code = "NA",
+                                city = "NA",
+                                country = "EG",
+                                state = "NA"
+                            },
+                            currency = "EGP",
+                            integration_id = _integrationId
+                        }),
+                        Encoding.UTF8, "application/json"));
+
+                var paymentKeyJson = await paymentKeyResponse.Content.ReadAsStringAsync();
+
+                if (!paymentKeyResponse.IsSuccessStatusCode)
+                    return StatusCode(500, new { step = "payment_key", paymobResponse = paymentKeyJson });
+
+                var paymentKeyData = JsonSerializer.Deserialize<JsonElement>(paymentKeyJson);
+                if (!paymentKeyData.TryGetProperty("token", out var payKeyProp))
+                    return StatusCode(500, new { step = "payment_key-parse", paymobResponse = paymentKeyJson });
+
+                var paymentKey = payKeyProp.GetString();
+
+                // ✅ Save Order as Pending
+                var order = new Order
+                {
+                    UserId = userId,
+                    TotalAmount = totalAmount,
+                    PaymobOrderId = paymobOrderId.ToString(),
+                    Status = "Pending",
+                    Items = cartItems.Select(c => new OrderItem
+                    {
+                        ProductId = c.ProductId,
+                        Quantity = c.Quantity,
+                        Price = c.Product.Price
+                    }).ToList()
+                };
+
+                _context.Orders.Add(order);
+                await _context.SaveChangesAsync();
+
+                var paymentUrl = $"https://accept.paymob.com/api/acceptance/iframes/{_integrationId}?payment_token={paymentKey}";
+
+                return Ok(new
+                {
+                    message = "Proceed to payment",
+                    paymentUrl,
+                    orderId = order.Id,
+                    totalAmount
+                });
+            }
+            catch (Exception ex)
             {
-                message = "Proceed to payment",
-                paymentUrl,
-                orderId = order.Id,
-                totalAmount
-            });
+                return StatusCode(500, new { message = "Checkout failed", error = ex.Message, stack = ex.StackTrace });
+            }
         }
 
         // ✅ Webhook - Paymob بيبعت التأكيد هنا

@@ -156,6 +156,7 @@ namespace DermaApp.API.Controllers
                     UserId = userId,
                     TotalAmount = totalAmount,
                     Status = "Pending",
+                    PaymobOrderId = "", // ← ضيفي ده
                     Items = cartItems.Select(c => new OrderItem
                     {
                         ProductId = c.ProductId,
@@ -179,7 +180,12 @@ namespace DermaApp.API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Checkout failed", error = ex.Message });
+                return StatusCode(500, new
+                {
+                    message = "Checkout failed",
+                    error = ex.Message,
+                    inner = ex.InnerException?.Message
+                });
             }
         }
 

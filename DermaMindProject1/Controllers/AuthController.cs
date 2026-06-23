@@ -204,7 +204,7 @@ namespace DermaApp.API.Controllers
             {
                 var settings = new Google.Apis.Auth.GoogleJsonWebSignature.ValidationSettings
                 {
-                    Audience = new List<string> { _config["Google:ClientId"] }
+                    Audience = new List<string> { "81157765082-f91sd3ld0pij8btnrk36ichplpm3vhto.apps.googleusercontent.com" }
                 };
 
                 var payload = await Google.Apis.Auth.GoogleJsonWebSignature.ValidateAsync(dto.IdToken, settings);
@@ -252,12 +252,10 @@ namespace DermaApp.API.Controllers
         [HttpGet("debug-google-config")]
         public IActionResult DebugGoogleConfig()
         {
-            return Ok(new
-            {
-                testVar = _config["TestVar"],
-                googleClientId = _config["Google:ClientId"]
-            });
+            var hardcodedClientId = "81157765082-f91sd3ld0pij8btnrk36ichplpm3vhto.apps.googleusercontent.com";
+            return Ok(new { hardcoded = hardcodedClientId });
         }
+        
 
         // 🔧 Helper - Generate JWT Token
         private string GenerateJwtToken(User user)

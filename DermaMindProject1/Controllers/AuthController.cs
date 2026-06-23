@@ -217,7 +217,9 @@ namespace DermaApp.API.Controllers
                     // مستخدم جديد - نعمل register تلقائي
                     user = new User
                     {
-                        FullName = payload.Name,
+                        FullName = !string.IsNullOrWhiteSpace(payload.Name)
+        ? payload.Name
+        : payload.Email.Split('@')[0],
                         Email = payload.Email,
                         UserName = payload.Email,
                         ProfileImage = payload.Picture,

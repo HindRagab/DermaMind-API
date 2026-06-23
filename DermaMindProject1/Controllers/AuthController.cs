@@ -213,6 +213,7 @@ namespace DermaApp.API.Controllers
 
                 if (user == null)
                 {
+
                     // مستخدم جديد - نعمل register تلقائي
                     user = new User
                     {
@@ -247,6 +248,11 @@ namespace DermaApp.API.Controllers
             {
                 return BadRequest(new { message = "Invalid Google token", error = ex.Message });
             }
+        }
+        [HttpGet("debug-google-config")]
+        public IActionResult DebugGoogleConfig()
+        {
+            return Ok(new { clientId = _config["Google:ClientId"] });
         }
 
         // 🔧 Helper - Generate JWT Token

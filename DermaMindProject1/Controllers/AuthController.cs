@@ -246,7 +246,8 @@ namespace DermaApp.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = "Invalid Google token", error = ex.Message });
+                var innerMessage = ex.InnerException?.Message ?? ex.Message;
+                return BadRequest(new { message = "Invalid Google token", error = ex.Message, inner = innerMessage });
             }
         }
         [HttpGet("debug-google-config")]

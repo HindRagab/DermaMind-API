@@ -3,6 +3,7 @@ using System.Text.Json;
 using DermaApp.API.Data;
 using DermaApp.API.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 
 namespace DermaApp.API.Controllers
 {
@@ -142,6 +143,51 @@ namespace DermaApp.API.Controllers
             {
                 return StatusCode(500, new { message = "AI service unreachable", error = ex.Message });
             }
+        }
+
+        // ✅ جلب تاريخ السكانات بتاعت اليوزر
+        [HttpGet("history")]
+        [Authorize]
+        public async Task<IActionResult> GetScanHistory()
+        {
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            var scans = await _context.DermaScanResults
+                .Where(s => s.UserId == userId)
+                .OrderByDescending(s => s.CreatedAt)
+                .ToListAsync();
+
+            var result = scans.Select(s => new
+            {
+                s.Id,
+                s.Diagnosis,
+                s.CreatedAt,
+                Result = JsonSerializer.Deserialize<JsonElement>(s.ResultJson)
+            });
+
+            return Ok(result);
+        }
+
+        // ✅ جلب سكان واحد بالتفصيل
+        [HttpGet("history/{id}")]
+        [Authorize]
+        public async Task<IActionResult> GetScanById(int id)
+        {
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            var scan = await _context.DermaScanResults
+                .FirstOrDefaultAsync(s => s.Id == id && s.UserId == userId);
+
+            if (scan == null)
+                return NotFound(new { message = "Scan not found" });
+
+            return Ok(new
+            {
+                scan.Id,
+                scan.Diagnosis,
+                scan.CreatedAt,
+                Result = JsonSerializer.Deserialize<JsonElement>(scan.ResultJson)
+            });
         }
     }
 }

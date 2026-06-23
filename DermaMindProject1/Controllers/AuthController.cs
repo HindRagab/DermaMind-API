@@ -252,15 +252,10 @@ namespace DermaApp.API.Controllers
         [HttpGet("debug-google-config")]
         public IActionResult DebugGoogleConfig()
         {
-            var allVars = Environment.GetEnvironmentVariables()
-                .Cast<System.Collections.DictionaryEntry>()
-                .Where(e => e.Key.ToString().Contains("Google", StringComparison.OrdinalIgnoreCase))
-                .ToDictionary(e => e.Key.ToString(), e => e.Value?.ToString());
-
             return Ok(new
             {
-                fromConfig = _config["Google:ClientId"],
-                fromEnvironment = allVars
+                testVar = _config["TestVar"],
+                googleClientId = _config["Google:ClientId"]
             });
         }
 

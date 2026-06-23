@@ -252,7 +252,16 @@ namespace DermaApp.API.Controllers
         [HttpGet("debug-google-config")]
         public IActionResult DebugGoogleConfig()
         {
-            return Ok(new { clientId = _config["Google:ClientId"] });
+            var allVars = Environment.GetEnvironmentVariables()
+                .Cast<System.Collections.DictionaryEntry>()
+                .Where(e => e.Key.ToString().Contains("Google", StringComparison.OrdinalIgnoreCase))
+                .ToDictionary(e => e.Key.ToString(), e => e.Value?.ToString());
+
+            return Ok(new
+            {
+                fromConfig = _config["Google:ClientId"],
+                fromEnvironment = allVars
+            });
         }
 
         // 🔧 Helper - Generate JWT Token

@@ -34,9 +34,12 @@ namespace DermaApp.API.Controllers
 
             var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif" };
             if (!allowedTypes.Contains(image.ContentType.ToLower()))
-                return BadRequest(new { message = "Only JPG, PNG, WEBP, and HEIC images are allowed" });
-
-            try
+                return BadRequest(new
+                {
+                    message = "Only JPG, PNG, WEBP, and HEIC images are allowed",
+                    receivedContentType = image.ContentType,
+                    fileName = image.FileName
+                });
             {
                 using var content = new MultipartFormDataContent();
                 using var stream = image.OpenReadStream();

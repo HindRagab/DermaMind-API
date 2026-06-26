@@ -9,7 +9,7 @@ namespace DermaApp.API.Controllers
     public class ChatbotController : ControllerBase
     {
         private readonly HttpClient _httpClient;
-        private readonly string _aiBaseUrl = "https://derma-mind-api-production-a4c0.up.railway.app";
+        private readonly string _aiBaseUrl = "https://derma-mind-api-production-baf2.up.railway.app";
         public ChatbotController(IHttpClientFactory httpClientFactory)
         {
             _httpClient = httpClientFactory.CreateClient();

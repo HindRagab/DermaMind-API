@@ -40,6 +40,8 @@ namespace DermaApp.API.Controllers
                     receivedContentType = image.ContentType,
                     fileName = image.FileName
                 });
+
+            try
             {
                 using var content = new MultipartFormDataContent();
                 using var stream = image.OpenReadStream();

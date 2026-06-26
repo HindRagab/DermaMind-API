@@ -32,9 +32,9 @@ namespace DermaApp.API.Controllers
             if (image == null || image.Length == 0)
                 return BadRequest(new { message = "Please upload an image" });
 
-            var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png" };
+            var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif" };
             if (!allowedTypes.Contains(image.ContentType.ToLower()))
-                return BadRequest(new { message = "Only JPG and PNG images are allowed" });
+                return BadRequest(new { message = "Only JPG, PNG, WEBP, and HEIC images are allowed" });
 
             try
             {

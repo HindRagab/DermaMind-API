@@ -17,7 +17,7 @@ namespace DermaApp.API.Controllers
 
         public DermaScanController(IHttpClientFactory httpClientFactory, AppDbContext context)
         {
-            _httpClient = httpClientFactory.CreateClient();
+            _httpClient = httpClientFactory.CreateClient(Guid.NewGuid().ToString());
             _context = context;
         }
 
